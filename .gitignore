@@ -1,0 +1,6 @@
+/.idea/
+target
+dependency-reduced-pom.xml
+FTAPI-*
+m2
+/flink-connector-futuopend.iml
