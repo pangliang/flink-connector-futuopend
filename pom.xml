@@ -48,7 +48,7 @@
         <dependency>
             <groupId>com.futunn.openapi</groupId>
             <artifactId>futu-api</artifactId>
-            <version>6.6.3108</version>
+            <version>7.0.3208</version>
         </dependency>
         <dependency>
             <groupId>commons-beanutils</groupId>
@@ -183,7 +183,7 @@
     <repositories>
         <repository>
             <id>ali-maven</id>
-            <url>https://maven.aliyun.com/repository/public</url>
+            <url>https://maven.aliyun.com/repository/central</url>
             <releases>
                 <enabled>true</enabled>
             </releases>
@@ -197,7 +197,7 @@
     <pluginRepositories>
         <pluginRepository>
             <id>aliyun</id>
-            <url>https://maven.aliyun.com/repository/public</url>
+            <url>https://maven.aliyun.com/repository/central</url>
             <releases>
                 <enabled>true</enabled>
                 <updatePolicy>always</updatePolicy>
