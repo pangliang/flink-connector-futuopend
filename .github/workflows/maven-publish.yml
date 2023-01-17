@@ -1,0 +1,31 @@
+# This workflow will build a package using Maven and then publish it to GitHub packages when a release is created
+# For more information see: https://github.com/actions/setup-java/blob/main/docs/advanced-usage.md#apache-maven-with-a-settings-path
+
+name: Maven Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-java@v3
+      with:
+        java-version: '8'
+        distribution: 'temurin'
+        cache: 'maven'
+
+    - name: Publish to GitHub Packages
+      run: mvn deploy -B -DskipTests=true -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/pangliang/flink-connector-futuopend
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    
+    - uses: actions/upload-artifact@v3
+      with:
+        path: target/flink-connector-futuopend*.jar
