@@ -1,6 +1,6 @@
 package com.zhaoxiaodan.flink.futuopend;
 
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import com.futu.openapi.FTAPI;
 import com.futu.openapi.FTAPI_Conn;
@@ -33,10 +33,9 @@ import org.apache.flink.table.data.RowData;
 public class FutuOpenDSourceFunction extends RichSourceFunction<RowData> implements ResultTypeQueryable<RowData>, FTSPI_Qot, FTSPI_Conn {
     private final FutuOpenDConfig futuOpenDConfig;
     private final DeserializationSchema<RowData> deserializer;
-    private volatile boolean isRunning = true;
     private FTAPI_Conn_Qot qot;
-    private CountDownLatch connectLock;
     private SourceContext<RowData> ctx;
+    private final LinkedBlockingQueue<String> exceptionQueue = new LinkedBlockingQueue<>(1);
 
     public FutuOpenDSourceFunction(FutuOpenDConfig futuOpenDConfig, DeserializationSchema<RowData> deserializer) {
         this.futuOpenDConfig = futuOpenDConfig;
@@ -54,7 +53,6 @@ public class FutuOpenDSourceFunction extends RichSourceFunction<RowData> impleme
 
         FTAPI.init();
         this.qot = new FTAPI_Conn_Qot();
-        this.connectLock = new CountDownLatch(1);
 
         qot.setClientInfo("flink-connector-futuopend", 1);
         qot.setConnSpi(this);
@@ -64,59 +62,75 @@ public class FutuOpenDSourceFunction extends RichSourceFunction<RowData> impleme
     @Override
     public void run(SourceContext<RowData> ctx) throws Exception {
         this.ctx = ctx;
-
         qot.initConnect(futuOpenDConfig.getOpendIP(), futuOpenDConfig.getOpendPort().shortValue(), false);
-        connectLock.await();
+        String msg = exceptionQueue.take();
+        throw new Exception(msg);
+    }
+
+    @Override
+    public void cancel() {
+        log.info("cancel method called");
+        qot.close();
+    }
+
+    private void throwException(String error) {
+        try {
+            exceptionQueue.put(error);
+        } catch (InterruptedException e) {
+            log.error("put error to signalQueue failed", e);
+        }
+
+        // to break com.futu.openapi.NetManager.loop()
+        throw new Error(error);
+    }
+
+    @Override
+    public void onInitConnect(FTAPI_Conn client, long errCode, String desc) {
+        log.info("onInitConnect: {}, {}, {}", client.getConnectID(), errCode, desc);
+        if(errCode != 0) {
+            throwException("initConnect fail: " + errCode + ", " + desc);
+        }
 
         SubType subType = SubType.valueOf("SubType_" + futuOpenDConfig.getSubType());
-
         for (String marketGroups : futuOpenDConfig.getCodes().split(";")) {
             String[] parts = marketGroups.split("\\|");
             if(parts.length != 2) {
-                throw new IllegalArgumentException("Invalid marketGroups: " + marketGroups + ", should be like: HK|00700,00701;US|AAPL,GOOG");
+                throwException("Invalid marketGroups: " + marketGroups + ", should be like: HK|00700,00701;US|AAPL,GOOG");
             }
             String marketStr = parts[0];
             String codesStr = parts[1];
             for(String code : codesStr.split(",")) {
                 QotMarket qotMarket = QotMarket.valueOf("QotMarket_" + marketStr + "_Security");
                 QotCommon.Security sec = QotCommon.Security.newBuilder()
-                    .setCode(code)
-                    .setMarket(qotMarket.getNumber())
-                    .build();
+                        .setCode(code)
+                        .setMarket(qotMarket.getNumber())
+                        .build();
                 QotSub.C2S c2s = QotSub.C2S.newBuilder()
-                    .addSecurityList(sec)
-                    .addSubTypeList(subType.getNumber())
-                    .setIsSubOrUnSub(true)
-                    .setIsRegOrUnRegPush(true)
-                    .setIsFirstPush(true)
-                    .build();
+                        .addSecurityList(sec)
+                        .addSubTypeList(subType.getNumber())
+                        .setIsSubOrUnSub(true)
+                        .setIsRegOrUnRegPush(true)
+                        .setIsFirstPush(true)
+                        .build();
                 QotSub.Request req = QotSub.Request.newBuilder().setC2S(c2s).build();
                 int seqNo = qot.sub(req);
                 log.info("sub seqNo: {}", seqNo);
             }
         }
-
-        while (isRunning) {
-            Thread.sleep(Long.MAX_VALUE);
-        }
-    }
-
-
-
-    @Override
-    public void cancel() {
-        isRunning = false;
     }
 
     @Override
-    public void onInitConnect(FTAPI_Conn client, long errCode, String desc) {
-        log.info("onInitConnect: {}, {}, {}", client.getConnectID(), errCode, desc);
-        connectLock.countDown();
+    public void onDisconnect(FTAPI_Conn client, long errCode) {
+        log.info("onDisconnect: {}, {}", client.getConnectID(), errCode);
+        throwException("onDisconnect: " + errCode);
     }
 
     @Override
     public void onReply_Sub(FTAPI_Conn client, int nSerialNo, Response rsp) {
         log.info("onReply_Sub: {}, {}, {}, {}, {}", client.getConnectID(), nSerialNo, rsp.getRetType(), rsp.getRetMsg(), rsp.getErrCode());
+        if(rsp.getRetType() != 0) {
+            throwException("sub fail: " + rsp.getRetType() + ", " + rsp.getRetMsg() + ", " + rsp.getErrCode());
+        }
     }
 
     @Override
