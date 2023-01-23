@@ -22,10 +22,6 @@ jobs:
         cache: 'maven'
 
     - name: Publish to GitHub Packages
-      run: mvn deploy -B -DskipTests=true -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/pangliang/flink-connector-futuopend
+      run: mvn deploy -B -DskipTests=true -Dgpg.skip -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/pangliang/flink-connector-futuopend
       env:
         GITHUB_TOKEN: ${{ github.token }}
-    
-    - uses: actions/upload-artifact@v3
-      with:
-        path: target/flink-connector-futuopend*.jar
