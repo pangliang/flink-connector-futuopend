@@ -1,0 +1,27 @@
+name: Maven Package
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    container:
+      image: node:16-bullseye
+      volumes:
+        - maven-cache:/root/.m2
+      options: --dns=192.168.100.200
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - uses: docker://pangliang/maven-mvnd:0.8.2-openjdk-8
+      with:
+          entrypoint: mvnd
+          args: | 
+            deploy -B -P aliyun-repo -DskipTests=true -Dgpg.skip 
+            -Drepo.id=gitea -Drepo.token=${{ secrets.MAVEN_DEPLOY }} -s ${{ github.workspace }}/settings.xml 
+            -DaltDeploymentRepository=gitea::default::https://gitea.v1.zhaoxiaodan.com/api/packages/pangliang/maven
+
+

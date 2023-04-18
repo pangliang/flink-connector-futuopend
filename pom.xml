@@ -9,7 +9,7 @@
     <version>1.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>${project.groupId}:${project.artifactId}</name>
+    <name>com.zhaoxiaodan.flink:flink-connector-futuopend</name>
     <description>A connector from futuopend to flink.</description>
     <url>https://github.com/pangliang/flink-connector-futuopend</url>
 

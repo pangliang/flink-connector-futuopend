@@ -1,0 +1,15 @@
+<settings>
+    <servers>
+        <server>
+            <id>${repo.id}</id>
+            <configuration>
+            <httpHeaders>
+                <property>
+                    <name>Authorization</name>
+                    <value>token ${repo.token}</value>
+                </property>
+            </httpHeaders>
+        </configuration>
+        </server>
+    </servers>
+</settings>  
